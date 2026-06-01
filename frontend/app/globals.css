@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --primary: #b7122a; }
+
+html, body { font-family: 'Montserrat', sans-serif; background-color: #fbf9f8; }
+
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 20px rgba(183,18,42,0.2); }
+  50%      { box-shadow: 0 0 40px rgba(183,18,42,0.5); }
+}
+.animate-glow { animation: glow 2s infinite ease-in-out; }

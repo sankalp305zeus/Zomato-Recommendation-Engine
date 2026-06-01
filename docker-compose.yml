@@ -1,31 +1,58 @@
 services:
 
-  # ── Main application ──────────────────────────────────────────────────────
-  app:
-    build: .
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     ports:
-      - "8501:8501"
-    env_file:
-      - .env                        # GROQ_API_KEY / LLM_API_KEY loaded here
+      - "8000:8000"
+    env_file: .env
     volumes:
-      - ./data:/app/data            # persist catalog cache across restarts
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
 
-  # ── One-shot catalog ingest (run once on a fresh clone) ───────────────────
+  # ── Next.js frontend ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── One-shot catalog ingest ────────────────────────────────────────────────
   # Usage: docker compose run --rm ingest
   ingest:
-    build: .
-    env_file:
-      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file: .env
     volumes:
       - ./data:/app/data
     command: ["python", "-m", "src.data.ingest"]
-    profiles:
-      - tools                       # not started by default; opt-in only
+    profiles: [tools]
+
+  # ── Streamlit MVP (optional — kept for demos) ──────────────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    profiles: [streamlit]

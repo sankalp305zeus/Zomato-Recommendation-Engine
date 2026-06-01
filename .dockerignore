@@ -25,6 +25,10 @@ data/restaurants.parquet
 docs/
 Makefile
 
+# Frontend (not needed in API image)
+frontend/node_modules/
+frontend/.next/
+
 # IDE
 .vscode/
 .idea/

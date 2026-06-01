@@ -1,4 +1,10 @@
 """Streamlit UI — Zomato AI Recommends.
+# Path fix: ensure project root is on sys.path when run via `streamlit run`
+import sys as _sys
+from pathlib import Path as _Path
+_root = _Path(__file__).resolve().parents[2]
+if str(_root) not in _sys.path:
+    _sys.path.insert(0, str(_root))
 
 Design system based on Google Stitch output (stitch_zomato_ai_recommends.zip).
 Colors, typography, and component styles match the Stitch-generated design tokens.
@@ -444,11 +450,25 @@ def _render_card(index: int, rec, *, is_fallback: bool) -> None:
 # ---------------------------------------------------------------------------
 
 def _render_welcome(catalog_size: int) -> None:
+    steps = [
+        ("🔍", "Filter",   "We narrow the full catalog to relevant matches"),
+        ("🤖", "AI Rank",  "Groq AI ranks picks with personalised explanations"),
+        ("✨", "Discover", "Top matches with ratings, costs & reasons"),
+    ]
+    step_cards = "".join(
+        '<div style="background:#fff;border-radius:1.25rem;padding:1.25rem 1rem;'
+        'border:1px solid #e4bebc;width:clamp(160px,28%,200px);'
+        'box-shadow:0 2px 8px rgba(0,0,0,0.05);">'
+        f'<div style="font-size:28px;margin-bottom:0.5rem;">{emoji}</div>'
+        f'<div style="font-weight:700;color:#1b1c1c;font-size:14px;margin-bottom:4px;">{step}</div>'
+        f'<div style="font-size:12px;color:#5f5e5e;">{desc}</div>'
+        '</div>'
+        for emoji, step, desc in steps
+    )
+    catalog_str = f"{catalog_size:,}"
+
     st.markdown(f"""
-    <div style="
-        text-align:center;padding:2.5rem 1rem;
-        font-family:'Montserrat',sans-serif;
-    ">
+    <div style="text-align:center;padding:2.5rem 1rem;font-family:'Montserrat',sans-serif;">
         <div style="font-size:52px;margin-bottom:0.75rem;">🍽️</div>
         <h1 style="
             font-size:clamp(24px,4vw,40px);font-weight:800;
@@ -459,36 +479,14 @@ def _render_welcome(catalog_size: int) -> None:
         <p style="font-size:16px;color:#5f5e5e;margin-bottom:2rem;">
             Tell us what you want. We'll handle the rest.
         </p>
-
-        <!-- How it works steps -->
-        <div style="
-            display:flex;gap:1.25rem;justify-content:center;flex-wrap:wrap;
-            max-width:700px;margin:0 auto 2rem;
-        ">
-            {''.join(f"""
-            <div style="
-                background:#fff;border-radius:1.25rem;padding:1.25rem 1rem;
-                border:1px solid #e4bebc;width:clamp(160px,28%,200px);
-                box-shadow:0 2px 8px rgba(0,0,0,0.05);
-            ">
-                <div style="font-size:28px;margin-bottom:0.5rem;">{emoji}</div>
-                <div style="font-weight:700;color:#1b1c1c;font-size:14px;margin-bottom:4px;">{step}</div>
-                <div style="font-size:12px;color:#5f5e5e;">{desc}</div>
-            </div>"""
-            for emoji, step, desc in [
-                ("🔍", "Filter", "We narrow the full catalog to relevant matches"),
-                ("🤖", "AI Rank", "Groq AI ranks picks with personalised explanations"),
-                ("✨", "Discover", "Top matches with ratings, costs & reasons"),
-            ])}
+        <div style="display:flex;gap:1.25rem;justify-content:center;flex-wrap:wrap;
+                    max-width:700px;margin:0 auto 2rem;">
+            {step_cards}
         </div>
-
-        <!-- Stats bar -->
-        <div style="
-            display:inline-flex;align-items:center;gap:8px;
-            background:var(--primary-fixed);color:var(--on-primary-fixed);
-            border-radius:9999px;padding:8px 20px;font-size:13px;font-weight:600;
-        ">
-            🍴 Searching across {catalog_size:,}+ restaurants in India
+        <div style="display:inline-flex;align-items:center;gap:8px;
+                    background:var(--primary-fixed);color:var(--on-primary-fixed);
+                    border-radius:9999px;padding:8px 20px;font-size:13px;font-weight:600;">
+            🍴 Searching across {catalog_str}+ restaurants in India
         </div>
     </div>
     """, unsafe_allow_html=True)

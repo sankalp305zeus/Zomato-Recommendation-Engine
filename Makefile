@@ -1,4 +1,4 @@
-.PHONY: test run api ingest mock docker-build docker-up docker-ingest docker-down help
+.PHONY: test run api ingest mock frontend install docker-build docker-up docker-ingest docker-down help
 
 help:               ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
@@ -23,6 +23,15 @@ api:                ## Start the FastAPI backend on port 8000 (with auto-reload)
 
 api-mock:           ## Start the FastAPI backend in offline mode (no Groq call)
 	MOCK_LLM=1 uvicorn src.api.main:app --reload --port 8000
+
+install:            ## Install frontend npm dependencies
+	cd frontend && npm install
+
+frontend:           ## Start the Next.js frontend dev server on port 3000
+	cd frontend && npm run dev
+
+frontend-build:     ## Build the Next.js frontend for production
+	cd frontend && npm run build
 
 # ── Docker ───────────────────────────────────────────────────────────────────
 
