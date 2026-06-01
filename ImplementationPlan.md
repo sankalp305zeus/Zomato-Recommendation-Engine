@@ -2,20 +2,20 @@
 
 This document defines **when and in what order** to build the AI-powered restaurant recommendation system. Each phase produces a runnable increment with clear exit criteria before moving on.
 
-**Source documents**
+**Source Documents**
 
 | Document | Role |
 |----------|------|
 | [problemStatement.md](./problemStatement.md) | Scope and success criteria |
 | [context.md](./context.md) | Workflow and output fields |
 | [architecture.md](./architecture.md) | Layers, components, data flow |
-| [edge-cases.md](./edge-cases.md) | Edge cases, expected behavior, tests |
+| [edge-cases.md](./docs/edge-cases.md) | Edge cases, expected behavior, tests |
 
 **Rule:** Do not start a phase until the previous phase’s exit criteria are met.
 
 ---
 
-## Summary timeline
+## Summary Timeline
 
 ```mermaid
 gantt
@@ -38,15 +38,15 @@ Durations are indicative (days of focused work). Adjust to your schedule.
 
 ---
 
-## Phase map: context + architecture
+## Phase Map: Context + Architecture
 
-| Phase | context.md | architecture.md layer | Primary modules |
+| Phase | context.md | architecture.md Layer | Primary Modules |
 |-------|------------|----------------------|-----------------|
 | 0 | — | Repo + config | Project skeleton |
-| 1 | [Data Ingestion](./context.md#data-ingestion) | Layer 1 — Data | `src/data/ingest.py`, `src/models/restaurant.py` |
-| 2 | [User Input](./context.md#user-input) | Layer 2 — Filtering | `src/models/preferences.py`, `src/filter/engine.py` |
-| 3 | [Integration](./context.md#integration-layer) + [Recommendation](./context.md#recommendation-engine) | Layers 3–4 | `src/llm/*`, `src/recommendation/engine.py`, `src/models/recommendation.py` |
-| 4 | [Output Display](./context.md#output-display) | Layer 5 — Presentation | `src/app/streamlit_app.py` |
+| 1 | [Data Ingestion](./context.md#1-data-ingestion--preprocessing) | Layer 1 — Data | `src/data/ingest.py`, `src/models/restaurant.py` |
+| 2 | [User Input](./context.md#2-user-input-extraction) | Layer 2 — Filtering | `src/models/preferences.py`, `src/filter/engine.py` |
+| 3 | [Integration](./context.md#3-integration--llm-prompting-layer) + [Recommendation](./context.md#4-recommendation-engine-llm) | Layers 3–4 | `src/llm/*`, `src/recommendation/engine.py`, `src/models/recommendation.py` |
+| 4 | [Output Display](./context.md#5-output-presentation) | Layer 5 — Presentation | `src/app/streamlit_app.py` |
 | 5 | Cross-cutting | §8 Security, reliability, testing | `tests/`, logging, README |
 | 6 | — | §11 Extension points | API, cache, feedback, etc. |
 
@@ -72,14 +72,13 @@ flowchart TD
 
 ---
 
-## Phase 0 — Project foundation
+## Phase 0 — Project Foundation
 
 **Goal:** Runnable repo, dependencies, and configuration — no business logic yet.
 
 **Architecture reference:** [§9 Physical module layout](./architecture.md#9-physical-module-layout), [§12 Technology choices](./architecture.md#12-technology-choices-mvp-defaults)
 
 ### Tasks
-
 - [ ] Initialize Python project (`pyproject.toml` or `requirements.txt`, Python 3.11+)
 - [ ] Add `.gitignore` (venv, `.env`, `__pycache__`, `data/`)
 - [ ] Create `src/` package layout per architecture (empty modules with `__init__.py`)
@@ -88,7 +87,6 @@ flowchart TD
 - [ ] Pin core deps: `datasets`, `pandas`, `python-dotenv`, `groq`, `streamlit`, `pytest`
 
 ### Deliverables
-
 ```
 src/
 ├── models/
@@ -103,21 +101,19 @@ data/          # gitignored
 requirements.txt
 ```
 
-### Exit criteria
-
-- Fresh clone → venv → `pip install -r requirements.txt` → imports succeed
-- Secrets never committed; only `.env.example` in git
+### Exit Criteria
+* Fresh clone → venv → `pip install -r requirements.txt` → imports succeed.
+* Secrets never committed; only `.env.example` in git.
 
 ---
 
-## Phase 1 — Data ingestion and normalization
+## Phase 1 — Data Ingestion and Normalization
 
 **Goal:** Load the Zomato dataset, normalize it, cache locally, and expose `load_catalog()`.
 
-**Maps to:** [context.md — Data Ingestion](./context.md#data-ingestion) · [architecture.md §5.1 Data layer](./architecture.md#51-data-layer)
+**Maps to:** [context.md — Data Ingestion](./context.md#1-data-ingestion--preprocessing) · [architecture.md §5.1 Data layer](./architecture.md#51-data-layer)
 
 ### Tasks
-
 - [ ] Load [ManikaSaini/zomato-restaurant-recommendation](https://huggingface.co/datasets/ManikaSaini/zomato-restaurant-recommendation) via `datasets`
 - [ ] Inspect schema; document column mapping in `src/data/ingest.py`
 - [ ] Implement `Restaurant` dataclass: `id`, `name`, `location`, `cuisines`, `rating`, `cost_for_two`, optional `metadata`
@@ -133,36 +129,33 @@ requirements.txt
 | `src/models/restaurant.py` | [Restaurant contract](./architecture.md#61-restaurant-internal) |
 | `src/data/ingest.py` | Ingest pipeline + `load_catalog()` |
 
-### Exit criteria
+### Exit Criteria
+* `load_catalog()` returns hundreds+ valid records.
+* Sample output shows name, location, cuisine, rating, cost for 3 restaurants.
+* Second run uses cache (faster, no re-download).
 
-- `load_catalog()` returns hundreds+ valid records
-- Sample output shows name, location, cuisine, rating, cost for 3 restaurants
-- Second run uses cache (faster, no re-download)
-
-### Manual test
-
+### Manual Test
 ```bash
 python -m src.data.ingest
 ```
 
 ---
 
-## Phase 2 — Filtering engine (no LLM)
+## Phase 2 — Filtering Engine (No LLM)
 
 **Goal:** Turn user preferences into a deterministic shortlist — proves data + filters before LLM cost/latency.
 
-**Maps to:** [context.md — User Input](./context.md#user-input) · [architecture.md §5.2 Filtering layer](./architecture.md#52-filtering-layer)
+**Maps to:** [context.md — User Input](./context.md#2-user-input-extraction) · [architecture.md §5.2 Filtering layer](./architecture.md#52-filtering-layer)
 
 ### Tasks
-
 - [ ] Implement `UserPreferences`: `location`, `budget`, `cuisine`, `min_rating`, `extras`
 - [ ] Define budget → `cost_for_two` bands (`low` / `medium` / `high`) after exploring dataset distribution
 - [ ] Filter rules:
-  - Location: case-insensitive match
-  - Rating: `rating >= min_rating`
-  - Cuisine: token or substring match on `cuisines`
-  - Budget: within mapped cost band
-  - Extras: keyword filter/boost on name/metadata when available
+  * Location: case-insensitive match
+  * Rating: `rating >= min_rating`
+  * Cuisine: token or substring match on `cuisines`
+  * Budget: within mapped cost band
+  * Extras: keyword filter/boost on name/metadata when available
 - [ ] Sort by rating (desc); cap shortlist at **20–50** restaurants
 - [ ] Return structured empty result with hints (relax rating, cuisine, or location)
 - [ ] Unit tests: `tests/test_filter.py` with 5–10 fixture restaurants
@@ -175,14 +168,12 @@ python -m src.data.ingest
 | `src/filter/engine.py` | `filter(catalog, prefs) -> list[Restaurant]` |
 | `tests/test_filter.py` | Edge cases: empty, single match, budget boundary |
 
-### Exit criteria
+### Exit Criteria
+* Typical prefs `(Delhi, medium, North Indian, 4.0)` → non-empty shortlist in **&lt; 1 s**.
+* Impossible prefs → empty list + helpful message.
+* All filter unit tests pass.
 
-- Typical prefs `(Delhi, medium, North Indian, 4.0)` → non-empty shortlist in **&lt; 1 s**
-- Impossible prefs → empty list + helpful message
-- All filter unit tests pass
-
-### Manual test
-
+### Manual Test
 ```bash
 python -c "
 from src.data.ingest import load_catalog
@@ -194,20 +185,19 @@ from src.models.preferences import UserPreferences
 
 ---
 
-## Phase 3 — LLM recommendation engine (Groq)
+## Phase 3 — LLM Recommendation Engine (Groq)
 
 **Goal:** Send shortlist + preferences to **Groq**; return structured ranked recommendations with explanations and fallback.
 
-**Maps to:** [context.md — Integration Layer](./context.md#integration-layer), [Recommendation Engine](./context.md#recommendation-engine) · [architecture.md §5.3–5.4](./architecture.md#53-integration-layer) · [Groq configuration](./architecture.md#53-integration-layer)
+**Maps to:** [context.md — Integration Layer](./context.md#3-integration--llm-prompting-layer), [Recommendation Engine](./context.md#4-recommendation-engine-llm) · [architecture.md §5.3–5.4](./architecture.md#53-integration-layer) · [Groq configuration](./architecture.md#53-integration-layer)
 
 ### Tasks
-
 - [ ] Implement `Recommendation` model: `restaurant_name`, `cuisine`, `rating`, `estimated_cost`, `explanation`, optional `summary`
 - [ ] Implement `LLMClient` interface + **`GroqClient`** in `src/llm/client.py` (not OpenAI)
 - [ ] Build prompts in `src/llm/prompts.py` per [prompt design principles](./architecture.md#53-integration-layer):
-  - Ground to shortlist only
-  - JSON array output
-  - Top 5 ranked picks with explanations
+  * Ground to shortlist only
+  * JSON array output
+  * Top 5 ranked picks with explanations
 - [ ] Implement `RecommendationEngine.recommend(shortlist, prefs)` in `src/recommendation/engine.py`
 - [ ] Parse and validate LLM JSON; retry once on malformed response
 - [ ] **Fallback:** Top-N from Phase 2 filter + template explanation if LLM fails
@@ -225,14 +215,12 @@ from src.models.preferences import UserPreferences
 | `src/recommendation/engine.py` | Orchestration + parser + fallback |
 | `tests/test_recommendation.py` | Mocked LLM responses |
 
-### Exit criteria
+### Exit Criteria
+* End-to-end script: prefs → filter → LLM → 3–5 `Recommendation` objects.
+* Fallback works with invalid `GROQ_API_KEY` or `MOCK_LLM=1`.
+* Output fields match [context.md output table](./context.md#5-output-presentation).
 
-- End-to-end script: prefs → filter → LLM → 3–5 `Recommendation` objects
-- Fallback works with invalid `GROQ_API_KEY` or `MOCK_LLM=1`
-- Output fields match [context.md output table](./context.md#output-display)
-
-### Manual test
-
+### Manual Test
 ```bash
 export GROQ_API_KEY=...
 export GROQ_MODEL=llama-3.3-70b-versatile   # optional
@@ -240,18 +228,15 @@ python -m src.recommendation.run \
   --location Bangalore --budget medium --cuisine Italian --min-rating 4.0
 ```
 
-*(Add `src/recommendation/run.py` CLI stub in this phase if helpful.)*
-
 ---
 
-## Phase 4 — Presentation layer (MVP UI + Groq)
+## Phase 4 — Presentation Layer (MVP UI + Groq)
 
 **Goal:** User-facing Streamlit app that calls the **Groq**-backed recommendation pipeline end-to-end.
 
-**Maps to:** [context.md — Output Display](./context.md#output-display) · [architecture.md §5.5 Presentation](./architecture.md#55-presentation-layer), [§7.1 MVP deployment](./architecture.md#71-mvp-single-process)
+**Maps to:** [context.md — Output Display](./context.md#5-output-presentation) · [architecture.md §5.5 Presentation](./architecture.md#55-presentation-layer), [§7.1 MVP deployment](./architecture.md#71-mvp-single-process)
 
 ### Tasks
-
 - [ ] Build Streamlit app in `src/app/streamlit_app.py`
 - [ ] Form fields: location, budget (select), cuisine, min rating, extras (text or multiselect)
 - [ ] Validate input before pipeline (required fields, rating range 0–5)
@@ -271,14 +256,12 @@ python -m src.recommendation.run \
 | `src/app/streamlit_app.py` | MVP UI |
 | `README.md` | `streamlit run src/app/streamlit_app.py` |
 
-### Exit criteria
+### Exit Criteria
+* Non-developer can run locally, submit prefs, see ≥3 recommendations with explanations.
+* Invalid form input shows inline errors.
+* Matches [end-to-end sequence](./architecture.md#4-end-to-end-request-flow).
 
-- Non-developer can run locally, submit prefs, see ≥3 recommendations with explanations
-- Invalid form input shows inline errors
-- Matches [end-to-end sequence](./architecture.md#4-end-to-end-request-flow)
-
-### Manual test
-
+### Manual Test
 ```bash
 # .env: GROQ_API_KEY=gsk_...
 streamlit run src/app/streamlit_app.py
@@ -289,33 +272,29 @@ MOCK_LLM=1 streamlit run src/app/streamlit_app.py
 
 ---
 
-## Phase 5 — Hardening, testing, and documentation
+## Phase 5 — Hardening, Testing, and Documentation
 
 **Goal:** Demo-ready quality: tests green, logging, documented limitations.
 
 **Maps to:** [architecture.md §8 Cross-cutting concerns](./architecture.md#8-cross-cutting-concerns), [§13 Known limitations](./architecture.md#13-known-limitations)
 
 ### Tasks
-
 - [ ] Ensure `pytest` passes for filter + recommendation (mocked LLM)
 - [ ] Add logging: catalog size, shortlist size, LLM latency, fallback flag — **never** log API keys
 - [ ] README: link to `docs/architecture.md`, env vars, dataset attribution, limitations
 - [ ] Prompt review: model must not invent restaurants outside shortlist
-- [ ] Optional: `Makefile` or `scripts/dev.sh` for `test`, `run`, `ingest`
 - [ ] Run smoke test checklist (below)
 
 ### Deliverables
-
 - Green `tests/`
 - Updated `README.md` and cross-links in `docs/`
 - Smoke test checklist (documented)
 
-### Exit criteria
+### Exit Criteria
+* Full demo path on clean machine using README steps only.
+* Limitations documented (dataset cities, LLM cost, budget heuristics).
 
-- Full demo path on clean machine using README steps only
-- Limitations documented (dataset cities, LLM cost, budget heuristics)
-
-### Smoke test checklist
+### Smoke Test Checklist
 
 | # | Step | Expected |
 |---|------|----------|
@@ -328,7 +307,7 @@ MOCK_LLM=1 streamlit run src/app/streamlit_app.py
 
 ---
 
-## Phase 6 — Extensions (optional)
+## Phase 6 — Extensions (Optional)
 
 **Goal:** Evolve the product without rewriting core layers.
 
@@ -339,21 +318,20 @@ Pick one or more mini-phases; each should not break Phase 5 smoke tests.
 | Extension | Tasks | Depends on |
 |-----------|--------|------------|
 | **REST API** | FastAPI in `src/api/` wrapping filter + recommend; JSON in/out | Phase 5 |
-| **Recommendation cache** | Hash `(prefs + shortlist ids)` → cache LLM JSON; TTL config | Phase 3 |
+| **Recommendation Cache** | Hash `(prefs + shortlist ids)` → cache LLM JSON; TTL config | Phase 3 |
 | **Feedback** | Thumbs up/down in UI; store locally for prompt notes | Phase 4 |
-| **Location autocomplete** | Derive city list from catalog; Streamlit selectbox | Phase 1, 4 |
+| **Location Autocomplete** | Derive city list from catalog; Streamlit selectbox | Phase 1, 4 |
 | **Observability** | Structured JSON logs or simple metrics file | Phase 5 |
 | **Alternate LLM** | Second `LLMClient` (Groq is default) | Phase 3 |
-| **Vector search** | Optional semantic match before filter cap | Phase 1, 2 |
+| **Vector Search** | Optional semantic match before filter cap | Phase 1, 2 |
 
-### Exit criteria (per extension)
-
-- Feature documented in README or `docs/`
-- Phase 5 smoke tests still pass
+### Exit Criteria (Per Extension)
+* Feature documented in README or `docs/`
+* Phase 5 smoke tests still pass
 
 ---
 
-## Suggested repo structure (end state)
+## Suggested Repo Structure (End State)
 
 ```
 testrepo/
@@ -366,7 +344,7 @@ testrepo/
 │   ├── problemStatement.md
 │   ├── context.md
 │   ├── architecture.md
-│   └── implementation-plan.md  # this file
+│   └── implementation-plan.md  # docs copy
 ├── src/
 │   ├── models/
 │   │   ├── restaurant.py       # Phase 1
@@ -391,20 +369,19 @@ testrepo/
 
 ---
 
-## Definition of done (whole project)
+## Definition of Done (Whole Project)
 
 Aligned with [problemStatement.md](./problemStatement.md) and [context.md](./context.md):
-
-- [ ] User can enter location, budget, cuisine, minimum rating, and optional extras
-- [ ] System uses the Hugging Face Zomato dataset ([link](./context.md#data-ingestion))
-- [ ] Groq LLM ranks restaurants and provides explanations (optional summary)
-- [ ] Results show: restaurant name, cuisine, rating, estimated cost, AI explanation
-- [ ] Architecture layers remain separable in code ([dependency rule](./architecture.md#9-physical-module-layout))
-- [ ] LLM failure degrades gracefully ([fallback path](./architecture.md#54-recommendation-engine))
+- [ ] User can enter location, budget, cuisine, minimum rating, and optional extras.
+- [ ] System uses the Hugging Face Zomato dataset ([link](./context.md#1-data-ingestion--preprocessing)).
+- [ ] Groq LLM ranks restaurants and provides explanations (optional summary).
+- [ ] Results show: restaurant name, cuisine, rating, estimated cost, AI explanation.
+- [ ] Architecture layers remain separable in code ([dependency rule](./architecture.md#9-physical-module-layout)).
+- [ ] LLM failure degrades gracefully ([fallback path](./architecture.md#54-recommendation-engine)).
 
 ---
 
-## Latency targets (MVP)
+## Latency Targets (MVP)
 
 From [architecture.md §4](./architecture.md#4-end-to-end-request-flow):
 
@@ -417,14 +394,12 @@ From [architecture.md §4](./architecture.md#4-end-to-end-request-flow):
 
 ---
 
-## Document map
+## Document Map
 
 ```
 problemStatement.md     →  why
 context.md              →  what (workflow)
 architecture.md         →  how (structure)
-implementation-plan.md  →  when (phases) — this file
-edge-cases.md           →  what can go wrong
+ImplementationPlan.md   →  when (phases) — this file
+docs/edge-cases.md      →  what can go wrong
 ```
-
-After Phase 0, update this file if actual `src/` paths differ from the suggestion above.

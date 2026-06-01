@@ -1,10 +1,10 @@
 # Architecture: AI-Powered Restaurant Recommendation System
 
-This document describes **how** the system is structured: layers, components, data contracts, and runtime flow. It is derived from [context.md](./context.md) and aligned with [problemStatement.md](../problemStatement.md) and [implementation-plan.md](./implementation-plan.md).
+This document describes **how** the system is structured: layers, components, data contracts, and runtime flow. It is derived from [context.md](./context.md) and aligned with [problemStatement.md](./problemStatement.md) and [implementation-plan.md](./docs/implementation-plan.md).
 
 ---
 
-## 1. Architectural goals
+## 1. Architectural Goals
 
 | Goal | Rationale |
 |------|-----------|
@@ -16,7 +16,7 @@ This document describes **how** the system is structured: layers, components, da
 
 ---
 
-## 2. High-level system context
+## 2. High-Level System Context
 
 ```mermaid
 flowchart LR
@@ -46,14 +46,13 @@ flowchart LR
 ```
 
 **Actors**
-
-- **User** — Submits preferences and reads recommendations.
-- **Hugging Face** — Source of truth for restaurant catalog ([ManikaSaini/zomato-restaurant-recommendation](https://huggingface.co/datasets/ManikaSaini/zomato-restaurant-recommendation)).
-- **Groq** — LLM provider (Phase 3–4). Ranks shortlist, writes explanations, optional summary via chat completions API.
+* **User** — Submits preferences and reads recommendations.
+* **Hugging Face** — Source of truth for restaurant catalog ([ManikaSaini/zomato-restaurant-recommendation](https://huggingface.co/datasets/ManikaSaini/zomato-restaurant-recommendation)).
+* **Groq** — LLM provider (Phase 3–4). Ranks shortlist, writes explanations, optional summary via chat completions API.
 
 ---
 
-## 3. Layered architecture
+## 3. Layered Architecture
 
 The system follows five logical layers mapped directly to [context.md](./context.md) workflow sections.
 
@@ -92,15 +91,15 @@ flowchart TB
 
 | Layer | Maps to context.md | Responsibility |
 |-------|-------------------|----------------|
-| **Data** | [Data Ingestion](./context.md#data-ingestion) | Load dataset, normalize schema, cache catalog |
-| **Filtering** | [User Input](./context.md#user-input) (constraints) | Apply hard filters; produce shortlist |
-| **Integration** | [Integration Layer](./context.md#integration-layer) | Serialize shortlist + prefs into LLM prompt; parse JSON response |
-| **Recommendation** | [Recommendation Engine](./context.md#recommendation-engine) | Invoke LLM; validate output; fallback ranking |
-| **Presentation** | [Output Display](./context.md#output-display) | Forms, validation, formatted results |
+| **Data** | [Data Ingestion](./context.md#1-data-ingestion) | Load dataset, normalize schema, cache catalog |
+| **Filtering** | [User Input](./context.md#2-user-input) (constraints) | Apply hard filters; produce shortlist |
+| **Integration** | [Integration Layer](./context.md#3-integration--llm-prompting-layer) | Serialize shortlist + prefs into LLM prompt; parse JSON response |
+| **Recommendation** | [Recommendation Engine](./context.md#4-recommendation-engine) | Invoke LLM; validate output; fallback ranking |
+| **Presentation** | [Output Display](./context.md#5-output-presentation) | Forms, validation, formatted results |
 
 ---
 
-## 4. End-to-end request flow
+## 4. End-to-End Request Flow
 
 ```mermaid
 sequenceDiagram
@@ -138,7 +137,7 @@ sequenceDiagram
     end
 ```
 
-**Typical latency budget (MVP)**
+**Typical Latency Budget (MVP)**
 
 | Step | Target |
 |------|--------|
@@ -149,9 +148,9 @@ sequenceDiagram
 
 ---
 
-## 5. Component design
+## 5. Component Design
 
-### 5.1 Data layer
+### 5.1 Data Layer
 
 **Purpose:** Ingest and preprocess the Zomato dataset; expose a stable in-memory (or cached) catalog.
 
@@ -189,9 +188,9 @@ flowchart LR
 
 ---
 
-### 5.2 Filtering layer
+### 5.2 Filtering Layer
 
-**Purpose:** Apply deterministic rules from [User Input](./context.md#user-input) before any LLM call.
+**Purpose:** Apply deterministic rules from [User Input](./context.md#2-user-input) before any LLM call.
 
 | Component | File (suggested) | Description |
 |-----------|------------------|-------------|
@@ -226,9 +225,9 @@ UserPreferences:
 
 ---
 
-### 5.3 Integration layer
+### 5.3 Integration Layer
 
-**Purpose:** Bridge structured data and the LLM per [Integration Layer](./context.md#integration-layer).
+**Purpose:** Bridge structured data and the LLM per [Integration Layer](./context.md#3-integration--llm-prompting-layer).
 
 | Component | File (suggested) | Description |
 |-----------|------------------|-------------|
@@ -238,7 +237,6 @@ UserPreferences:
 | `ResponseParser` | `src/recommendation/engine.py` | JSON parse + schema validation |
 
 **Prompt design principles**
-
 1. **Grounding** — Instruct the model to choose **only** restaurants present in the provided shortlist (by name/id).
 2. **Structured output** — Require JSON array matching `Recommendation` schema.
 3. **Reasoning** — Ask for a short explanation per pick tied to user preferences.
@@ -272,9 +270,9 @@ User:
 
 ---
 
-### 5.4 Recommendation engine
+### 5.4 Recommendation Engine
 
-**Purpose:** Orchestrate LLM call and produce final [Output Display](./context.md#output-display) objects.
+**Purpose:** Orchestrate LLM call and produce final [Output Display](./context.md#5-output-presentation) objects.
 
 | Component | File (suggested) | Description |
 |-----------|------------------|-------------|
@@ -312,9 +310,9 @@ flowchart TD
 
 ---
 
-### 5.5 Presentation layer
+### 5.5 Presentation Layer
 
-**Purpose:** Collect [User Input](./context.md#user-input) and render [Output Display](./context.md#output-display).
+**Purpose:** Collect [User Input](./context.md#2-user-input) and render [Output Display](./context.md#5-output-presentation).
 
 | Component | File (suggested) | Description |
 |-----------|------------------|-------------|
@@ -322,18 +320,17 @@ flowchart TD
 | CLI (optional) | `src/cli/main.py` | Scriptable demo |
 
 **UI responsibilities**
-
-- Form: location, budget (select), cuisine, min rating, extras
-- Client-side validation (required fields, rating range)
-- Loading indicator during LLM call
-- Result cards/table with all five output fields
-- Empty and error states without stack traces
+- Form: location, budget (select), cuisine, min rating, extras.
+- Client-side validation (required fields, rating range).
+- Loading indicator during LLM call.
+- Result cards/table with all five output fields.
+- Empty and error states without stack traces.
 
 ---
 
-## 6. Data contracts
+## 6. Data Contracts
 
-### 6.1 Restaurant (internal)
+### 6.1 Restaurant (Internal)
 
 ```json
 {
@@ -347,7 +344,7 @@ flowchart TD
 }
 ```
 
-### 6.2 UserPreferences (input)
+### 6.2 UserPreferences (Input)
 
 ```json
 {
@@ -359,7 +356,7 @@ flowchart TD
 }
 ```
 
-### 6.3 Recommendation (output)
+### 6.3 Recommendation (Output)
 
 ```json
 {
@@ -373,9 +370,9 @@ flowchart TD
 
 ---
 
-## 7. Deployment views
+## 7. Deployment Views
 
-### 7.1 MVP (single process)
+### 7.1 MVP (Single Process)
 
 ```mermaid
 flowchart TB
@@ -390,11 +387,11 @@ flowchart TB
     ST --> API[Groq API]
 ```
 
-- One Python process
-- Secrets in `.env` (never committed)
-- No separate database in MVP
+* One Python process.
+* Secrets in `.env` (never committed).
+* No separate database in MVP.
 
-### 7.2 Target (optional extension)
+### 7.2 Target (Optional Extension)
 
 ```mermaid
 flowchart LR
@@ -405,11 +402,11 @@ flowchart LR
     Rec --> Groq[Groq API]
 ```
 
-See [Extension points](#extension-points).
+See [Extension points](#11-extension-points).
 
 ---
 
-## 8. Cross-cutting concerns
+## 8. Cross-Cutting Concerns
 
 ### 8.1 Security
 
@@ -428,13 +425,12 @@ See [Extension points](#extension-points).
 | Empty catalog | Fail fast at startup with clear error |
 
 ### 8.3 Observability (MVP)
+* Log: catalog size, shortlist size, LLM latency, fallback usage.
+* Do not log: API keys, full API responses in debug without redaction.
 
-- Log: catalog size, shortlist size, LLM latency, fallback usage
-- Do not log: API keys, full API responses in debug without redaction
+### 8.4 Testing Strategy
 
-### 8.4 Testing strategy
-
-| Layer | Test type |
+| Layer | Test Type |
 |-------|-------------|
 | Filter | Unit tests with fixture restaurants |
 | Integration / LLM | Mock client returning fixed JSON |
@@ -443,9 +439,9 @@ See [Extension points](#extension-points).
 
 ---
 
-## 9. Physical module layout
+## 9. Physical Module Layout
 
-Aligned with [implementation-plan.md — Suggested repo structure](./implementation-plan.md#suggested-repo-structure):
+Aligned with [implementation-plan.md — Suggested repo structure](./docs/implementation-plan.md#suggested-repo-structure):
 
 ```
 src/
@@ -480,23 +476,23 @@ flowchart BT
 
 ---
 
-## 10. Mapping: context.md → architecture
+## 10. Mapping: context.md → Architecture
 
-| context.md section | Architecture artifact |
+| context.md Section | Architecture Artifact |
 |--------------------|------------------------|
-| Data Ingestion | Data layer, `ingest.py`, local cache |
-| User Input | `UserPreferences`, UI form, filter rules |
-| Integration Layer | `PromptBuilder`, `LLMClient`, shortlist serialization |
-| Recommendation Engine | `RecommendationEngine`, fallback, optional summary |
-| Output Display | `Recommendation` model, Streamlit table/cards |
+| 1. Data Ingestion | Data layer, `ingest.py`, local cache |
+| 2. User Input | `UserPreferences`, UI form, filter rules |
+| 3. Integration Layer | `PromptBuilder`, `LLMClient`, shortlist serialization |
+| 4. Recommendation Engine | `RecommendationEngine`, fallback, optional summary |
+| 5. Output Presentation | `Recommendation` model, Streamlit table/cards |
 
 ---
 
-## 11. Extension points
+## 11. Extension Points
 
-Designed for incremental evolution without rewriting core layers ([implementation-plan Phase 6](./implementation-plan.md#phase-6--extensions-optional)).
+Designed for incremental evolution without rewriting core layers ([implementation-plan Phase 6](./docs/implementation-plan.md#phase-6--extensions-optional)).
 
-| Extension | Touch layers | Notes |
+| Extension | Touch Layers | Notes |
 |-----------|--------------|-------|
 | **REST API** | Presentation → new `api/` package | FastAPI wraps existing pipeline; same contracts |
 | **Recommendation cache** | Integration + Recommendation | Key = hash(preferences + shortlist ids); TTL configurable |
@@ -508,7 +504,7 @@ Designed for incremental evolution without rewriting core layers ([implementatio
 
 ---
 
-## 12. Technology choices (MVP defaults)
+## 12. Technology Choices (MVP Defaults)
 
 | Concern | Choice | Alternatives |
 |---------|--------|--------------|
@@ -521,24 +517,22 @@ Designed for incremental evolution without rewriting core layers ([implementatio
 
 ---
 
-## 13. Known limitations
+## 13. Known Limitations
 
-- **Dataset coverage** — Recommendations limited to cities and restaurants present in the Hugging Face dataset.
-- **Budget mapping** — `low` / `medium` / `high` thresholds are heuristic until calibrated on data distribution.
-- **LLM grounding** — Prompt constraints reduce but do not eliminate wrong picks; validation should cross-check names against shortlist.
-- **Cost** — Each Groq request may incur API usage; Groq free tier limits apply; caching and shortlist caps mitigate volume.
-- **No auth in MVP** — Single-user local demo; add auth at API layer for multi-tenant deployments.
+* **Dataset coverage** — Recommendations limited to cities and restaurants present in the Hugging Face dataset.
+* **Budget mapping** — `low` / `medium` / `high` thresholds are heuristic until calibrated on data distribution.
+* **LLM grounding** — Prompt constraints reduce but do not eliminate wrong picks; validation should cross-check names against shortlist.
+* **Cost** — Each Groq request may incur API usage; Groq free tier limits apply; caching and shortlist caps mitigate volume.
+* **No auth in MVP** — Single-user local demo; add auth at API layer for multi-tenant deployments.
 
 ---
 
-## 14. Document map
+## 14. Document Map
 
 ```
-problemStatement.md     →  why (goals)
-context.md              →  what (workflow)
-architecture.md         →  how (structure) — this file
-implementation-plan.md  →  when (phases)
-edge-cases.md           →  failure modes & handling
+problemStatement.md          →  why (goals)
+context.md                   →  what (workflow)
+architecture.md              →  how (structure) — this file
+docs/implementation-plan.md  →  when (phases)
+docs/edge-cases.md           →  failure modes & handling
 ```
-
-After implementation begins, update the **Physical module layout** section if actual paths diverge from the suggestion above.
