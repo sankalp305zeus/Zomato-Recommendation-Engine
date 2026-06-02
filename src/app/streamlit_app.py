@@ -1,10 +1,11 @@
 # from __future__ must be the very first statement — sys.path fix comes right after
 from __future__ import annotations
 
-import sys as _sys, pathlib as _pl
-_root = str(_pl.Path(__file__).resolve().parents[2])
-if _root not in _sys.path:
-    _sys.path.insert(0, _root)
+import sys as _sys, os as _os, pathlib as _pl
+# Streamlit Cloud: cwd is repo root. Local: use __file__ to find repo root.
+for _p in [_os.getcwd(), str(_pl.Path(__file__).resolve().parents[2])]:
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
 
 import logging
 import os
